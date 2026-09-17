@@ -14,9 +14,9 @@ st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
 CSV_FILE = "observations.csv"
 
-# Create the observations file
+# Create database file if it does not exist
 if not os.path.exists(CSV_FILE):
-    empty_data = pd.DataFrame(columns=[
+    pd.DataFrame(columns=[
         "Date",
         "Location",
         "Latitude",
@@ -26,14 +26,13 @@ if not os.path.exists(CSV_FILE):
         "Count",
         "Temperature",
         "Notes"
-    ])
-    empty_data.to_csv(CSV_FILE, index=False)
+    ]).to_csv(CSV_FILE, index=False)
 
 st.divider()
 
-# -------------------------
+# =========================
 # ADD OBSERVATION
-# -------------------------
+# =========================
 
 st.header("📸 Add Observation")
 
@@ -59,14 +58,14 @@ with st.form("observation_form"):
     with col1:
         latitude = st.number_input(
             "🌐 Latitude",
-            value=36.1900,
+            value=36.190000,
             format="%.6f"
         )
 
     with col2:
         longitude = st.number_input(
             "🌐 Longitude",
-            value=5.4100,
+            value=5.410000,
             format="%.6f"
         )
 
@@ -104,8 +103,7 @@ with st.form("observation_form"):
     )
 
     notes = st.text_area(
-        "📝 Notes",
-        placeholder="Write your observations here..."
+        "📝 Notes"
     )
 
     submitted = st.form_submit_button(
@@ -113,32 +111,37 @@ with st.form("observation_form"):
     )
 
 
-# -------------------------
-# SAVE OBSERVATION
-# -------------------------
+# =========================
+# SAVE
+# =========================
 
 if submitted:
 
     new_observation = pd.DataFrame({
         "Date": [str(observation_date)],
         "Location": [location],
-        "Latitude": [latitude],
-        "Longitude": [longitude],
+        "Latitude": [float(latitude)],
+        "Longitude": [float(longitude)],
         "Habitat": [habitat],
         "Pollinator": [organism],
-        "Count": [count],
-        "Temperature": [temperature],
+        "Count": [int(count)],
+        "Temperature": [float(temperature)],
         "Notes": [notes]
     })
 
-    old_data = pd.read_csv(CSV_FILE)
+    data = pd.read_csv(CSV_FILE)
 
-    updated_data = pd.concat(
-        [old_data, new_observation],
+    # Make sure old files have the new columns
+    for column in new_observation.columns:
+        if column not in data.columns:
+            data[column] = None
+
+    data = pd.concat(
+        [data, new_observation],
         ignore_index=True
     )
 
-    updated_data.to_csv(
+    data.to_csv(
         CSV_FILE,
         index=False
     )
@@ -151,9 +154,11 @@ if submitted:
             caption="Observation photo",
             width=400
         )
-# -------------------------
-# BIODIVERSITY MAP
-# -------------------------
+
+
+# =========================
+# MAP
+# =========================
 
 st.divider()
 
@@ -161,33 +166,50 @@ st.header("🗺️ Biodiversity Map")
 
 data = pd.read_csv(CSV_FILE)
 
-# Add missing coordinate columns to old data
-if "Latitude" not in data.columns:
-    data["Latitude"] = None
+if "Latitude" in data.columns and "Longitude" in data.columns:
 
-if "Longitude" not in data.columns:
-    data["Longitude"] = None
+    map_data = data[[
+        "Latitude",
+        "Longitude"
+    ]].copy()
 
-data.to_csv(CSV_FILE, index=False)
-
-map_data = data[
-    ["Latitude", "Longitude"]
-].dropna()
-
-if not map_data.empty:
-    st.map(
-        map_data,
-        zoom=11
+    map_data["Latitude"] = pd.to_numeric(
+        map_data["Latitude"],
+        errors="coerce"
     )
+
+    map_data["Longitude"] = pd.to_numeric(
+        map_data["Longitude"],
+        errors="coerce"
+    )
+
+    map_data = map_data.dropna()
+
+    if len(map_data) > 0:
+
+        st.map(
+            map_data,
+            latitude="Latitude",
+            longitude="Longitude",
+            zoom=11
+        )
+
+    else:
+
+        st.info(
+            "Add an observation with coordinates to display the map."
+        )
+
 else:
+
     st.info(
-        "No coordinates available for the map yet."
+        "Map coordinates are not available yet."
     )
 
 
-# -------------------------
-# OBSERVATIONS TABLE
-# -------------------------
+# =========================
+# TABLE
+# =========================
 
 st.divider()
 
