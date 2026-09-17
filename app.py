@@ -14,9 +14,9 @@ st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
 CSV_FILE = "observations.csv"
 
-# Create database
+# Create the observations file
 if not os.path.exists(CSV_FILE):
-    df = pd.DataFrame(columns=[
+    empty_data = pd.DataFrame(columns=[
         "Date",
         "Location",
         "Latitude",
@@ -27,9 +27,13 @@ if not os.path.exists(CSV_FILE):
         "Temperature",
         "Notes"
     ])
-    df.to_csv(CSV_FILE, index=False)
+    empty_data.to_csv(CSV_FILE, index=False)
 
 st.divider()
+
+# -------------------------
+# ADD OBSERVATION
+# -------------------------
 
 st.header("📸 Add Observation")
 
@@ -89,10 +93,117 @@ with st.form("observation_form"):
     count = st.number_input(
         "🔢 Number of individuals",
         min_value=1,
-        value=1
+        value=1,
+        step=1
     )
 
-    temperature = st.number_input) 
+    temperature = st.number_input(
         "🌡️ Temperature (°C)",
         value=20.0,
-        step=0)
+        step=0.5
+    )
+
+    notes = st.text_area(
+        "📝 Notes",
+        placeholder="Write your observations here..."
+    )
+
+    submitted = st.form_submit_button(
+        "💾 Save Observation"
+    )
+
+
+# -------------------------
+# SAVE OBSERVATION
+# -------------------------
+
+if submitted:
+
+    new_observation = pd.DataFrame({
+        "Date": [str(observation_date)],
+        "Location": [location],
+        "Latitude": [latitude],
+        "Longitude": [longitude],
+        "Habitat": [habitat],
+        "Pollinator": [organism],
+        "Count": [count],
+        "Temperature": [temperature],
+        "Notes": [notes]
+    })
+
+    old_data = pd.read_csv(CSV_FILE)
+
+    updated_data = pd.concat(
+        [old_data, new_observation],
+        ignore_index=True
+    )
+
+    updated_data.to_csv(
+        CSV_FILE,
+        index=False
+    )
+
+    st.success("✅ Observation saved successfully!")
+
+    if photo is not None:
+        st.image(
+            photo,
+            caption="Observation photo",
+            width=400
+        )
+
+
+# -------------------------
+# BIODIVERSITY MAP
+# -------------------------
+
+st.divider()
+
+st.header("🗺️ Biodiversity Map")
+
+data = pd.read_csv(CSV_FILE)
+
+if not data.empty:
+
+    map_data = data[
+        ["Latitude", "Longitude"]
+    ].dropna()
+
+    if not map_data.empty:
+        st.map(
+            map_data,
+            zoom=11
+        )
+    else:
+        st.info(
+            "No coordinates available for the map."
+        )
+
+else:
+    st.info(
+        "No observations available for the map yet."
+    )
+
+
+# -------------------------
+# OBSERVATIONS TABLE
+# -------------------------
+
+st.divider()
+
+st.header("📊 Recorded Observations")
+
+data = pd.read_csv(CSV_FILE)
+
+if not data.empty:
+
+    st.dataframe(
+        data,
+        use_container_width=True
+    )
+
+else:
+
+    st.info(
+        "No observations recorded yet."
+    )
