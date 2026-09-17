@@ -1,5 +1,7 @@
 import streamlit as st
+import pandas as pd
 from datetime import date
+import os
 
 st.set_page_config(
     page_title="BioWatch Sétif",
@@ -10,10 +12,20 @@ st.set_page_config(
 st.title("🌿 BioWatch Sétif")
 st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
-st.write(
-    "A citizen-science platform for monitoring pollinators "
-    "under environmental change."
-)
+CSV_FILE = "observations.csv"
+
+# Create database file if it doesn't exist
+if not os.path.exists(CSV_FILE):
+    df = pd.DataFrame(columns=[
+        "Date",
+        "Location",
+        "Habitat",
+        "Pollinator",
+        "Count",
+        "Temperature",
+        "Notes"
+    ])
+    df.to_csv(CSV_FILE, index=False)
 
 st.divider()
 
@@ -59,21 +71,17 @@ with st.form("observation_form"):
     count = st.number_input(
         "🔢 Number of individuals",
         min_value=1,
-        value=1,
-        step=1
+        value=1
     )
 
     temperature = st.number_input(
         "🌡️ Temperature (°C)",
-        min_value=-20.0,
-        max_value=60.0,
         value=20.0,
         step=0.5
     )
 
     notes = st.text_area(
-        "📝 Notes",
-        placeholder="Flower visited, behavior, habitat details..."
+        "📝 Notes"
     )
 
     submitted = st.form_submit_button(
@@ -81,17 +89,34 @@ with st.form("observation_form"):
     )
 
 if submitted:
-    st.success("✅ Observation recorded successfully!")
 
-    if photo is not None:
-        st.image(
-            photo,
-            caption="Uploaded observation",
-            width=400
-        )
+    new_observation = pd.DataFrame([{
+        "Date": str(observation_date),
+        "Location": location,
+        "Habitat": habitat,
+        "Pollinator": organism,
+        "Count": count,
+        "Temperature": temperature,
+        "Notes": notes
+    }])
 
-    st.write("**Date:**", observation_date)
-    st.write("**Location:**", location)
-    st.write("**Habitat:**", habitat)
-    st.write("**Pollinator:**", organism)
-    st
+    old_data = pd.read_csv(CSV_FILE)
+    updated_data = pd.concat(
+        [old_data, new_observation],
+        ignore_index=True
+    )
+
+    updated_data.to_csv(CSV_FILE, index=False)
+
+    st.success("✅ Observation saved successfully!")
+
+st.divider()
+
+st.header("📊 Recorded Observations")
+
+data = pd.read_csv(CSV_FILE)
+
+if len(data) > 0:
+    st.dataframe(data, use_container_width=True)
+else:
+    st.info("No observations recorded yet.")
