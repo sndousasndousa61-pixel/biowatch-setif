@@ -14,11 +14,13 @@ st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
 CSV_FILE = "observations.csv"
 
-# Create database file if it doesn't exist
+# Create database
 if not os.path.exists(CSV_FILE):
     df = pd.DataFrame(columns=[
         "Date",
         "Location",
+        "Latitude",
+        "Longitude",
         "Habitat",
         "Pollinator",
         "Count",
@@ -47,6 +49,22 @@ with st.form("observation_form"):
         "📍 Location",
         placeholder="Example: Sétif"
     )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        latitude = st.number_input(
+            "🌐 Latitude",
+            value=36.1900,
+            format="%.6f"
+        )
+
+    with col2:
+        longitude = st.number_input(
+            "🌐 Longitude",
+            value=5.4100,
+            format="%.6f"
+        )
 
     habitat = st.selectbox(
         "🌱 Habitat type",
@@ -77,46 +95,4 @@ with st.form("observation_form"):
     temperature = st.number_input(
         "🌡️ Temperature (°C)",
         value=20.0,
-        step=0.5
-    )
-
-    notes = st.text_area(
-        "📝 Notes"
-    )
-
-    submitted = st.form_submit_button(
-        "💾 Save Observation"
-    )
-
-if submitted:
-
-    new_observation = pd.DataFrame([{
-        "Date": str(observation_date),
-        "Location": location,
-        "Habitat": habitat,
-        "Pollinator": organism,
-        "Count": count,
-        "Temperature": temperature,
-        "Notes": notes
-    }])
-
-    old_data = pd.read_csv(CSV_FILE)
-    updated_data = pd.concat(
-        [old_data, new_observation],
-        ignore_index=True
-    )
-
-    updated_data.to_csv(CSV_FILE, index=False)
-
-    st.success("✅ Observation saved successfully!")
-
-st.divider()
-
-st.header("📊 Recorded Observations")
-
-data = pd.read_csv(CSV_FILE)
-
-if len(data) > 0:
-    st.dataframe(data, use_container_width=True)
-else:
-    st.info("No observations recorded yet.")
+        step=0
