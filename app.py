@@ -151,8 +151,6 @@ if submitted:
             caption="Observation photo",
             width=400
         )
-
-
 # -------------------------
 # BIODIVERSITY MAP
 # -------------------------
@@ -163,25 +161,27 @@ st.header("🗺️ Biodiversity Map")
 
 data = pd.read_csv(CSV_FILE)
 
-if not data.empty:
+# Add missing coordinate columns to old data
+if "Latitude" not in data.columns:
+    data["Latitude"] = None
 
-    map_data = data[
-        ["Latitude", "Longitude"]
-    ].dropna()
+if "Longitude" not in data.columns:
+    data["Longitude"] = None
 
-    if not map_data.empty:
-        st.map(
-            map_data,
-            zoom=11
-        )
-    else:
-        st.info(
-            "No coordinates available for the map."
-        )
+data.to_csv(CSV_FILE, index=False)
 
+map_data = data[
+    ["Latitude", "Longitude"]
+].dropna()
+
+if not map_data.empty:
+    st.map(
+        map_data,
+        zoom=11
+    )
 else:
     st.info(
-        "No observations available for the map yet."
+        "No coordinates available for the map yet."
     )
 
 
