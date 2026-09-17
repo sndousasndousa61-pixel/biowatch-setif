@@ -92,7 +92,7 @@ with st.form("observation_form"):
         value=1
     )
 
-    temperature = st.number_input(
+    temperature = st.number_input) 
         "🌡️ Temperature (°C)",
         value=20.0,
-        step=0
+        step=0)
