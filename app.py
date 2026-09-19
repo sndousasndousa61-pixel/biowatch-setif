@@ -14,7 +14,7 @@ st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
 CSV_FILE = "observations.csv"
 
-# Create database file if it does not exist
+# Create file if it does not exist
 if not os.path.exists(CSV_FILE):
     pd.DataFrame(columns=[
         "Date",
@@ -28,12 +28,12 @@ if not os.path.exists(CSV_FILE):
         "Notes"
     ]).to_csv(CSV_FILE, index=False)
 
-st.divider()
 
 # =========================
 # ADD OBSERVATION
 # =========================
 
+st.divider()
 st.header("📸 Add Observation")
 
 with st.form("observation_form"):
@@ -104,20 +104,154 @@ with st.form("observation_form"):
 
     notes = st.text_area(
         "📝 Notes"
-    )# =========================
+    )
+
+    submitted = st.form_submit_button(
+        "💾 Save Observation"
+    )
+
+
+# =========================
+# SAVE OBSERVATION
+# =========================
+
+if submitted:
+
+    new_observation = pd.DataFrame({
+        "Date": [str(observation_date)],
+        "Location": [location],
+        "Latitude": [float(latitude)],
+        "Longitude": [float(longitude)],
+        "Habitat": [habitat],
+        "Pollinator": [organism],
+        "Count": [int(count)],
+        "Temperature": [float(temperature)],
+        "Notes": [notes]
+    })
+
+    data = pd.read_csv(CSV_FILE)
+
+    for column in new_observation.columns:
+        if column not in data.columns:
+            data[column] = None
+
+    data = pd.concat(
+        [data, new_observation],
+        ignore_index=True
+    )
+
+    data.to_csv(
+        CSV_FILE,
+        index=False
+    )
+
+    st.success("✅ Observation saved successfully!")
+
+    if photo is not None:
+        st.image(
+            photo,
+            caption="Observation photo",
+            width=400
+        )
+
+
+# =========================
+# LOAD DATA
+# =========================
+
+data = pd.read_csv(CSV_FILE)
+
+
+# =========================
+# MAP
+# =========================
+
+st.divider()
+st.header("🗺️ Biodiversity Map")
+
+if "Latitude" in data.columns and "Longitude" in data.columns:
+
+    map_data = data[
+        ["Latitude", "Longitude"]
+    ].copy()
+
+    map_data["Latitude"] = pd.to_numeric(
+        map_data["Latitude"],
+        errors="coerce"
+    )
+
+    map_data["Longitude"] = pd.to_numeric(
+        map_data["Longitude"],
+        errors="coerce"
+    )
+
+    map_data = map_data.dropna()
+
+    if not map_data.empty:
+
+        st.map(
+            map_data,
+            latitude="Latitude",
+            longitude="Longitude",
+            zoom=11
+        )
+
+    else:
+
+        st.info(
+            "Add an observation with coordinates to display the map."
+        )
+
+else:
+
+    st.info(
+        "Map coordinates are not available yet."
+    )
+
+
+# =========================
+# OBSERVATIONS TABLE
+# =========================
+
+st.divider()
+st.header("📋 Recorded Observations")
+
+if not data.empty:
+
+    st.dataframe(
+        data,
+        use_container_width=True
+    )
+
+else:
+
+    st.info(
+        "No observations recorded yet."
+    )
+
+
+# =========================
 # DASHBOARD
 # =========================
-data = pd.read_csv(CSV_FILE)
-st.divider()
 
+st.divider()
 st.header("📊 Biodiversity Dashboard")
 
 if not data.empty:
 
     total_observations = len(data)
-    total_individuals = int(data["Count"].sum())
-    pollinator_groups = data["Pollinator"].nunique()
-    habitats = data["Habitat"].nunique()
+
+    total_individuals = int(
+        data["Count"].sum()
+    )
+
+    pollinator_groups = data[
+        "Pollinator"
+    ].nunique()
+
+    habitats = data[
+        "Habitat"
+    ].nunique()
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -145,144 +279,32 @@ if not data.empty:
             habitats
         )
 
-    st.subheader("🐝 Observations by Pollinator Group")
+    st.subheader(
+        "🐝 Observations by Pollinator Group"
+    )
 
-    pollinator_counts = data["Pollinator"].value_counts()
+    pollinator_counts = data[
+        "Pollinator"
+    ].value_counts()
 
-    st.bar_chart(pollinator_counts)
+    st.bar_chart(
+        pollinator_counts
+    )
 
-    st.subheader("🌱 Observations by Habitat")
+    st.subheader(
+        "🌱 Observations by Habitat"
+    )
 
-    habitat_counts = data["Habitat"].value_counts()
+    habitat_counts = data[
+        "Habitat"
+    ].value_counts()
 
-    st.bar_chart(habitat_counts)
+    st.bar_chart(
+        habitat_counts
+    )
 
 else:
 
     st.info(
         "Add observations to see the biodiversity dashboard."
-    )
-
-    submitted = st.form_submit_button(
-        "💾 Save Observation"
-    )
-
-
-# =========================
-# SAVE
-# =========================
-
-if submitted:
-
-    new_observation = pd.DataFrame({
-        "Date": [str(observation_date)],
-        "Location": [location],
-        "Latitude": [float(latitude)],
-        "Longitude": [float(longitude)],
-        "Habitat": [habitat],
-        "Pollinator": [organism],
-        "Count": [int(count)],
-        "Temperature": [float(temperature)],
-        "Notes": [notes]
-    })
-
-    data = pd.read_csv(CSV_FILE)
-
-    # Make sure old files have the new columns
-    for column in new_observation.columns:
-        if column not in data.columns:
-            data[column] = None
-
-    data = pd.concat(
-        [data, new_observation],
-        ignore_index=True
-    )
-
-    data.to_csv(
-        CSV_FILE,
-        index=False
-    )
-
-    st.success("✅ Observation saved successfully!")
-
-    if photo is not None:
-        st.image(
-            photo,
-            caption="Observation photo",
-            width=400
-        )
-
-
-# =========================
-# MAP
-# =========================
-
-st.divider()
-
-st.header("🗺️ Biodiversity Map")
-
-data = pd.read_csv(CSV_FILE)
-
-if "Latitude" in data.columns and "Longitude" in data.columns:
-
-    map_data = data[[
-        "Latitude",
-        "Longitude"
-    ]].copy()
-
-    map_data["Latitude"] = pd.to_numeric(
-        map_data["Latitude"],
-        errors="coerce"
-    )
-
-    map_data["Longitude"] = pd.to_numeric(
-        map_data["Longitude"],
-        errors="coerce"
-    )
-
-    map_data = map_data.dropna()
-
-    if len(map_data) > 0:
-
-        st.map(
-            map_data,
-            latitude="Latitude",
-            longitude="Longitude",
-            zoom=11
-        )
-
-    else:
-
-        st.info(
-            "Add an observation with coordinates to display the map."
-        )
-
-else:
-
-    st.info(
-        "Map coordinates are not available yet."
-    )
-
-
-# =========================
-# TABLE
-# =========================
-
-st.divider()
-
-st.header("📊 Recorded Observations")
-
-data = pd.read_csv(CSV_FILE)
-
-if not data.empty:
-
-    st.dataframe(
-        data,
-        use_container_width=True
-    )
-
-else:
-
-    st.info(
-        "No observations recorded yet."
     )
