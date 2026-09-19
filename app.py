@@ -14,7 +14,10 @@ st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
 CSV_FILE = "observations.csv"
 
-# Create file if it does not exist
+# =========================
+# CREATE DATA FILE
+# =========================
+
 if not os.path.exists(CSV_FILE):
     pd.DataFrame(columns=[
         "Date",
@@ -161,6 +164,23 @@ if submitted:
 
 data = pd.read_csv(CSV_FILE)
 
+# Make sure old data has all required columns
+required_columns = [
+    "Date",
+    "Location",
+    "Latitude",
+    "Longitude",
+    "Habitat",
+    "Pollinator",
+    "Count",
+    "Temperature",
+    "Notes"
+]
+
+for column in required_columns:
+    if column not in data.columns:
+        data[column] = None
+
 
 # =========================
 # MAP
@@ -169,43 +189,35 @@ data = pd.read_csv(CSV_FILE)
 st.divider()
 st.header("🗺️ Biodiversity Map")
 
-if "Latitude" in data.columns and "Longitude" in data.columns:
+map_data = data[
+    ["Latitude", "Longitude"]
+].copy()
 
-    map_data = data[
-        ["Latitude", "Longitude"]
-    ].copy()
+map_data["Latitude"] = pd.to_numeric(
+    map_data["Latitude"],
+    errors="coerce"
+)
 
-    map_data["Latitude"] = pd.to_numeric(
-        map_data["Latitude"],
-        errors="coerce"
+map_data["Longitude"] = pd.to_numeric(
+    map_data["Longitude"],
+    errors="coerce"
+)
+
+map_data = map_data.dropna()
+
+if not map_data.empty:
+
+    st.map(
+        map_data,
+        latitude="Latitude",
+        longitude="Longitude",
+        zoom=11
     )
-
-    map_data["Longitude"] = pd.to_numeric(
-        map_data["Longitude"],
-        errors="coerce"
-    )
-
-    map_data = map_data.dropna()
-
-    if not map_data.empty:
-
-        st.map(
-            map_data,
-            latitude="Latitude",
-            longitude="Longitude",
-            zoom=11
-        )
-
-    else:
-
-        st.info(
-            "Add an observation with coordinates to display the map."
-        )
 
 else:
 
     st.info(
-        "Map coordinates are not available yet."
+        "Add an observation with coordinates to display the map."
     )
 
 
@@ -236,23 +248,52 @@ else:
 
 st.divider()
 st.header("📊 Biodiversity Dashboard")
+
+# Habitat filter
 habitat_filter = st.selectbox(
     "🌱 Filter by habitat",
-    ["All", "Natural area", "Agricultural area", "Urban area"]
-    )
-if not data.empty:
+    [
+        "All",
+        "Natural area",
+        "Agricultural area",
+        "Urban area"
+    ]
+)
 
-    total_observations = len(data)
+# Apply filter
+if habitat_filter == "All":
+
+    dashboard_data = data
+
+else:
+
+    dashboard_data = data[
+        data["Habitat"] == habitat_filter
+    ]
+
+
+if not dashboard_data.empty:
+
+    # -------------------------
+    # KEY INDICATORS
+    # -------------------------
+
+    total_observations = len(
+        dashboard_data
+    )
 
     total_individuals = int(
-        data["Count"].sum()
+        pd.to_numeric(
+            dashboard_data["Count"],
+            errors="coerce"
+        ).fillna(0).sum()
     )
 
-    pollinator_groups = data[
+    pollinator_groups = dashboard_data[
         "Pollinator"
     ].nunique()
 
-    habitats = data[
+    habitats = dashboard_data[
         "Habitat"
     ].nunique()
 
@@ -282,25 +323,37 @@ if not data.empty:
             habitats
         )
 
+
+    # -------------------------
+    # POLLINATOR CHART
+    # -------------------------
+
     st.subheader(
         "🐝 Observations by Pollinator Group"
     )
 
-    pollinator_counts = data[
-        "Pollinator"
-    ].value_counts()
+    pollinator_counts = (
+        dashboard_data["Pollinator"]
+        .value_counts()
+    )
 
     st.bar_chart(
         pollinator_counts
     )
 
+
+    # -------------------------
+    # HABITAT CHART
+    # -------------------------
+
     st.subheader(
         "🌱 Observations by Habitat"
     )
 
-    habitat_counts = data[
-        "Habitat"
-    ].value_counts()
+    habitat_counts = (
+        dashboard_data["Habitat"]
+        .value_counts()
+    )
 
     st.bar_chart(
         habitat_counts
@@ -309,5 +362,5 @@ if not data.empty:
 else:
 
     st.info(
-        "Add observations to see the biodiversity dashboard."
-    )
+        "No observations available for this habitat."
+)
