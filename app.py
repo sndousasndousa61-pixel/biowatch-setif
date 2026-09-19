@@ -104,6 +104,63 @@ with st.form("observation_form"):
 
     notes = st.text_area(
         "📝 Notes"
+    )# =========================
+# DASHBOARD
+# =========================
+
+st.divider()
+
+st.header("📊 Biodiversity Dashboard")
+
+if not data.empty:
+
+    total_observations = len(data)
+    total_individuals = int(data["Count"].sum())
+    pollinator_groups = data["Pollinator"].nunique()
+    habitats = data["Habitat"].nunique()
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric(
+            "🔎 Observations",
+            total_observations
+        )
+
+    with col2:
+        st.metric(
+            "🐝 Individuals",
+            total_individuals
+        )
+
+    with col3:
+        st.metric(
+            "🌿 Pollinator groups",
+            pollinator_groups
+        )
+
+    with col4:
+        st.metric(
+            "🏞️ Habitats",
+            habitats
+        )
+
+    st.subheader("🐝 Observations by Pollinator Group")
+
+    pollinator_counts = data["Pollinator"].value_counts()
+
+    st.bar_chart(pollinator_counts)
+
+    st.subheader("🌱 Observations by Habitat")
+
+    habitat_counts = data["Habitat"].value_counts()
+
+    st.bar_chart(habitat_counts)
+
+else:
+
+    st.info(
+        "Add observations to see the biodiversity dashboard."
     )
 
     submitted = st.form_submit_button(
