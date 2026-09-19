@@ -107,7 +107,7 @@ with st.form("observation_form"):
     )# =========================
 # DASHBOARD
 # =========================
-
+data = pd.read_csv(CSV_FILE)
 st.divider()
 
 st.header("📊 Biodiversity Dashboard")
