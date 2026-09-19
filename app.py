@@ -236,7 +236,10 @@ else:
 
 st.divider()
 st.header("📊 Biodiversity Dashboard")
-
+habitat_filter = st.selectbox(
+    "🌱 Filter by habitat",
+    ["All", "Natural area", "Agricultural area", "Urban area"]
+    )
 if not data.empty:
 
     total_observations = len(data)
