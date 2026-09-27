@@ -1,11 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-
-from st_supabase_connection import (
-    SupabaseConnection,
-    execute_query
-)
+from supabase import create_client
 
 st.set_page_config(
     page_title="BioWatch Sétif",
@@ -16,20 +12,21 @@ st.set_page_config(
 st.title("🌿 BioWatch Sétif")
 st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
+# -------------------------
+# SUPABASE
+# -------------------------
 
-# =========================
-# SUPABASE CONNECTION
-# =========================
+try:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase = create_client(url, key)
+except Exception as e:
+    st.error("Supabase connection is not configured.")
+    st.stop()
 
-conn = st.connection(
-    "supabase",
-    type=SupabaseConnection
-)
-
-
-# =========================
+# -------------------------
 # ADD OBSERVATION
-# =========================
+# -------------------------
 
 st.divider()
 st.header("📸 Add Observation")
@@ -76,7 +73,7 @@ with st.form("observation_form"):
         ]
     )
 
-    organism = st.selectbox(
+    pollinator = st.selectbox(
         "🐝 Pollinator group",
         [
             "Bee",
@@ -100,43 +97,39 @@ with st.form("observation_form"):
         step=0.5
     )
 
-    notes = st.text_area(
-        "📝 Notes"
-    )
+    notes = st.text_area("📝 Notes")
 
     submitted = st.form_submit_button(
         "💾 Save Observation"
     )
 
-
-# =========================
-# SAVE TO SUPABASE
-# =========================
+# -------------------------
+# SAVE
+# -------------------------
 
 if submitted:
 
-    observation = {
-        "observation_date": str(observation_date),
-        "location": location,
-        "latitude": float(latitude),
-        "longitude": float(longitude),
-        "habitat": habitat,
-        "pollinator": organism,
-        "observation_count": int(count),
-        "temperature": float(temperature),
-        "notes": notes
-    }
-
     try:
 
-        execute_query(
-            conn.table("observations").insert([observation]),
-            ttl=0
-        )
+        observation = {
+            "observation_date": str(observation_date),
+            "location": location,
+            "latitude": float(latitude),
+            "longitude": float(longitude),
+            "habitat": habitat,
+            "pollinator": pollinator,
+            "observation_count": int(count),
+            "temperature": float(temperature),
+            "notes": notes
+        }
 
-        st.success(
-            "✅ Observation saved successfully!"
-        )
+        supabase.table(
+            "observations"
+        ).insert(
+            observation
+        ).execute()
+
+        st.success("✅ Observation saved successfully!")
 
         if photo is not None:
             st.image(
@@ -146,242 +139,4 @@ if submitted:
             )
 
     except Exception as e:
-
-        st.error(
-            f"❌ Could not save observation: {e}"
-        )
-
-
-# =========================
-# LOAD DATA FROM SUPABASE
-# =========================
-
-try:
-
-    result = execute_query(
-        conn.table("observations")
-        .select("*")
-        .order("observation_date", desc=True),
-        ttl=0
-    )
-
-    rows = result.data
-
-    data = pd.DataFrame(rows)
-
-except Exception as e:
-
-    st.error(
-        f"❌ Could not load observations: {e}"
-    )
-
-    data = pd.DataFrame()
-
-
-# =========================
-# PREPARE DATA
-# =========================
-
-if not data.empty:
-
-    data = data.rename(
-        columns={
-            "observation_date": "Date",
-            "location": "Location",
-            "latitude": "Latitude",
-            "longitude": "Longitude",
-            "habitat": "Habitat",
-            "pollinator": "Pollinator",
-            "observation_count": "Count",
-            "temperature": "Temperature",
-            "notes": "Notes"
-        }
-    )
-
-
-# =========================
-# MAP
-# =========================
-
-st.divider()
-st.header("🗺️ Biodiversity Map")
-
-if not data.empty:
-
-    map_data = data[
-        ["Latitude", "Longitude"]
-    ].copy()
-
-    map_data["Latitude"] = pd.to_numeric(
-        map_data["Latitude"],
-        errors="coerce"
-    )
-
-    map_data["Longitude"] = pd.to_numeric(
-        map_data["Longitude"],
-        errors="coerce"
-    )
-
-    map_data = map_data.dropna()
-
-    if not map_data.empty:
-
-        st.map(
-            map_data,
-            latitude="Latitude",
-            longitude="Longitude",
-            zoom=11
-        )
-
-    else:
-
-        st.info(
-            "Add an observation with coordinates to display the map."
-        )
-
-else:
-
-    st.info(
-        "Add an observation with coordinates to display the map."
-    )
-
-
-# =========================
-# OBSERVATIONS TABLE
-# =========================
-
-st.divider()
-st.header("📋 Recorded Observations")
-
-if not data.empty:
-
-    display_columns = [
-        "Date",
-        "Location",
-        "Latitude",
-        "Longitude",
-        "Habitat",
-        "Pollinator",
-        "Count",
-        "Temperature",
-        "Notes"
-    ]
-
-    st.dataframe(
-        data[display_columns],
-        use_container_width=True
-    )
-
-else:
-
-    st.info(
-        "No observations recorded yet."
-    )
-
-
-# =========================
-# DASHBOARD
-# =========================
-
-st.divider()
-st.header("📊 Biodiversity Dashboard")
-
-habitat_filter = st.selectbox(
-    "🌱 Filter by habitat",
-    [
-        "All",
-        "Natural area",
-        "Agricultural area",
-        "Urban area"
-    ]
-)
-
-if habitat_filter == "All":
-
-    dashboard_data = data
-
-else:
-
-    dashboard_data = data[
-        data["Habitat"] == habitat_filter
-    ]
-
-
-if not dashboard_data.empty:
-
-    total_observations = len(
-        dashboard_data
-    )
-
-    total_individuals = int(
-        pd.to_numeric(
-            dashboard_data["Count"],
-            errors="coerce"
-        ).fillna(0).sum()
-    )
-
-    pollinator_groups = dashboard_data[
-        "Pollinator"
-    ].nunique()
-
-    habitats = dashboard_data[
-        "Habitat"
-    ].nunique()
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric(
-            "🔎 Observations",
-            total_observations
-        )
-
-    with col2:
-        st.metric(
-            "🐝 Individuals",
-            total_individuals
-        )
-
-    with col3:
-        st.metric(
-            "🌿 Pollinator groups",
-            pollinator_groups
-        )
-
-    with col4:
-        st.metric(
-            "🏞️ Habitats",
-            habitats
-        )
-
-    st.subheader(
-        "🐝 Observations by Pollinator Group"
-    )
-
-    pollinator_counts = (
-        dashboard_data["Pollinator"]
-        .value_counts()
-    )
-
-    st.bar_chart(
-        pollinator_counts
-    )
-
-    st.subheader(
-        "🌱 Observations by Habitat"
-    )
-
-    habitat_counts = (
-        dashboard_data["Habitat"]
-        .value_counts()
-    )
-
-    st.bar_chart(
-        habitat_counts
-    )
-
-else:
-
-    st.info(
-        "No observations available for this habitat."
-    )
+        st.error(f"❌ Could
