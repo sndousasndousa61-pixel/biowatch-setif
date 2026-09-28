@@ -452,4 +452,3 @@ SupabaseException: Invalid URL
      65 │   │   if options is None:                                             
      66 │   │   │   options = ClientOptions(storage=SyncMemoryStorage())        
 ────────────────────────────────────────────────────────────────────────────────
-SupabaseException: Invalid URL
