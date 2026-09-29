@@ -1,34 +1,65 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from supabase import create_client
+import os
 
-st.set_page_config(page_title="BioWatch Sétif", page_icon="🌿", layout="wide")
+st.set_page_config(
+    page_title="BioWatch Sétif",
+    page_icon="🌿",
+    layout="wide"
+)
 
 st.title("🌿 BioWatch Sétif")
-st.caption("AI-assisted monitoring of local pollinator biodiversity")
+st.subheader("AI-assisted monitoring of local pollinator biodiversity")
 
-try:
-    db = create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"]
-    )
-except Exception as e:
-    st.error("❌ Supabase connection problem")
-    st.write(str(e))
-    st.stop()
+FILE = "observations.csv"
+
+COLUMNS = [
+    "Date", "Location", "Latitude", "Longitude",
+    "Habitat", "Pollinator", "Count",
+    "Temperature", "Notes"
+]
+
+if not os.path.exists(FILE):
+    pd.DataFrame(columns=COLUMNS).to_csv(FILE, index=False)
+
+data = pd.read_csv(FILE)
 
 st.divider()
 st.header("📸 Add Observation")
 
 with st.form("observation_form"):
-    photo = st.file_uploader("📷 Upload a photo", type=["jpg", "jpeg", "png"])
-    d = st.date_input("📅 Date", date.today())
-    location = st.text_input("📍 Location", "Sétif")
+
+    photo = st.file_uploader(
+        "📷 Upload a pollinator photo",
+        type=["jpg", "jpeg", "png"]
+    )
+
+    observation_date = st.date_input(
+        "📅 Date",
+        value=date.today()
+    )
+
+    location = st.text_input(
+        "📍 Location",
+        placeholder="Example: Sétif"
+    )
 
     c1, c2 = st.columns(2)
-    lat = c1.number_input("Latitude", value=36.190000, format="%.6f")
-    lon = c2.number_input("Longitude", value=5.410000, format="%.6f")
+
+    with c1:
+        latitude = st.number_input(
+            "🌐 Latitude",
+            value=36.190000,
+            format="%.6f"
+        )
+
+    with c2:
+        longitude = st.number_input(
+            "🌐 Longitude",
+            value=5.410000,
+            format="%.6f"
+        )
 
     habitat = st.selectbox(
         "🌱 Habitat",
@@ -40,105 +71,166 @@ with st.form("observation_form"):
         ["Bee", "Butterfly", "Hoverfly", "Other", "Unknown"]
     )
 
-    count = st.number_input("🔢 Number of individuals", 1, 1000, 1)
-    temperature = st.number_input("🌡️ Temperature °C", 0.0, 60.0, 20.0)
-    notes = st.text_area("📝 Notes")
+    count = st.number_input(
+        "🔢 Number of individuals",
+        min_value=1,
+        value=1
+    )
+
+    temperature = st.number_input(
+        "🌡️ Temperature (°C)",
+        value=20.0
+    )
+
+    notes = st.text_area(
+        "📝 Notes",
+        placeholder="Write your observation here..."
+    )
 
     save = st.form_submit_button("💾 Save Observation")
 
 if save:
-    row = {
-        "observation_date": str(d),
-        "location": location,
-        "latitude": float(lat),
-        "longitude": float(lon),
-        "habitat": habitat,
-        "pollinator": pollinator,
-        "observation_count": int(count),
-        "temperature": float(temperature),
-        "notes": notes
-    }
 
-    try:
-        db.table("observations").insert(row).execute()
-        st.success("✅ Observation saved successfully!")
+    new_row = pd.DataFrame([{
+        "Date": str(observation_date),
+        "Location": location,
+        "Latitude": latitude,
+        "Longitude": longitude,
+        "Habitat": habitat,
+        "Pollinator": pollinator,
+        "Count": count,
+        "Temperature": temperature,
+        "Notes": notes
+    }])
 
-        if photo:
-            st.image(photo, caption="Observation photo", width=400)
+    data = pd.concat([data, new_row], ignore_index=True)
+    data.to_csv(FILE, index=False)
 
-    except Exception as e:
-        st.error("❌ Could not save observation")
-        st.write(str(e))
+    st.success("✅ Observation saved successfully!")
+
+    if photo:
+        st.image(
+            photo,
+            caption="Uploaded pollinator observation",
+            width=400
+        )
 
 st.divider()
 st.header("🗺️ Biodiversity Map")
 
-try:
-    result = (
-        db.table("observations")
-        .select("*")
-        .order("observation_date", desc=True)
-        .execute()
+if not data.empty:
+
+    map_data = data[
+        ["Latitude", "Longitude"]
+    ].copy()
+
+    map_data["Latitude"] = pd.to_numeric(
+        map_data["Latitude"],
+        errors="coerce"
     )
 
-    data = pd.DataFrame(result.data)
+    map_data["Longitude"] = pd.to_numeric(
+        map_data["Longitude"],
+        errors="coerce"
+    )
 
-except Exception as e:
-    st.error("❌ Could not load observations")
-    st.write(str(e))
-    data = pd.DataFrame()
-
-if not data.empty:
-    map_data = data[["latitude", "longitude"]].copy()
-    map_data["latitude"] = pd.to_numeric(map_data["latitude"], errors="coerce")
-    map_data["longitude"] = pd.to_numeric(map_data["longitude"], errors="coerce")
     map_data = map_data.dropna()
 
     if not map_data.empty:
-        st.map(map_data, latitude="latitude", longitude="longitude", zoom=10)
-else:
-    st.info("No observations yet. Add your first observation above.")
+        st.map(map_data)
+    else:
+        st.info("No valid coordinates available.")
 
-st.divider()
-st.header("📋 Recorded Observations")
-
-if not data.empty:
-    st.dataframe(data, use_container_width=True)
 else:
-    st.info("No observations recorded yet.")
+    st.info("Add observations to display the biodiversity map.")
 
 st.divider()
 st.header("📊 Biodiversity Dashboard")
 
 if not data.empty:
 
-    habitat_filter = st.selectbox(
-        "🌱 Filter by habitat",
-        ["All", "Natural area", "Agricultural area", "Urban area"]
-    )
+    f1, f2 = st.columns(2)
 
-    if habitat_filter == "All":
-        filtered = data
-    else:
-        filtered = data[data["habitat"] == habitat_filter]
+    with f1:
+        habitat_filter = st.selectbox(
+            "🌱 Filter by habitat",
+            ["All"] + sorted(data["Habitat"].dropna().unique().tolist())
+        )
 
-    c1, c2, c3, c4 = st.columns(4)
+    with f2:
+        pollinator_filter = st.selectbox(
+            "🐝 Filter by pollinator",
+            ["All"] + sorted(data["Pollinator"].dropna().unique().tolist())
+        )
 
-    c1.metric("🔎 Observations", len(filtered))
+    filtered = data.copy()
 
-    total = pd.to_numeric(
-        filtered["observation_count"], errors="coerce"
-    ).fillna(0).sum()
+    if habitat_filter != "All":
+        filtered = filtered[
+            filtered["Habitat"] == habitat_filter
+        ]
 
-    c2.metric("🐝 Individuals", int(total))
-    c3.metric("🦋 Groups", filtered["pollinator"].nunique())
-    c4.metric("🌱 Habitats", filtered["habitat"].nunique())
+    if pollinator_filter != "All":
+        filtered = filtered[
+            filtered["Pollinator"] == pollinator_filter
+        ]
+
+    a, b, c, d = st.columns(4)
+
+    with a:
+        st.metric("🔎 Observations", len(filtered))
+
+    with b:
+        st.metric(
+            "🐝 Individuals",
+            int(pd.to_numeric(
+                filtered["Count"],
+                errors="coerce"
+            ).fillna(0).sum())
+        )
+
+    with c:
+        st.metric(
+            "🦋 Pollinator groups",
+            filtered["Pollinator"].nunique()
+        )
+
+    with d:
+        st.metric(
+            "🌱 Habitats",
+            filtered["Habitat"].nunique()
+        )
 
     st.subheader("🐝 Pollinator groups")
-    st.bar_chart(filtered["pollinator"].value_counts())
+    st.bar_chart(
+        filtered["Pollinator"].value_counts()
+    )
 
-    st.subheader("🌱 Habitat distribution")
-    st.bar_chart(filtered["habitat"].value_counts())
+    st.subheader("🌱 Habitats")
+    st.bar_chart(
+        filtered["Habitat"].value_counts()
+    )
+
+    st.subheader("📋 Observation Records")
+    st.dataframe(
+        filtered,
+        use_container_width=True
+    )
+
+    csv = filtered.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download observations CSV",
+        csv,
+        "biowatch_setif_observations.csv",
+        "text/csv"
+    )
 
 else:
-    st.info("Dashboard will appear after the first observation.")
+    st.info("No observations recorded yet.")
+
+st.divider()
+st.caption(
+    "BioWatch Sétif — Digital monitoring of pollinator biodiversity "
+    "under environmental change."
+)
