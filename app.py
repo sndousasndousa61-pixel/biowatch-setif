@@ -137,7 +137,11 @@ if not data.empty:
     map_data = map_data.dropna()
 
     if not map_data.empty:
-        st.map(map_data)
+        st.map(
+    map_data,
+    latitude="Latitude",
+    longitude="Longitude"
+        )
     else:
         st.info("No valid coordinates available.")
 
