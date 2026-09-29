@@ -136,12 +136,16 @@ if not data.empty:
 
     map_data = map_data.dropna()
 
+        map_data = map_data.dropna()
+
     if not map_data.empty:
-        st.map(
-    map_data,
-    latitude="Latitude",
-    longitude="Longitude"
+        map_data = map_data.rename(
+            columns={
+                "Latitude": "lat",
+                "Longitude": "lon"
+            }
         )
+        st.map(map_data)
     else:
         st.info("No valid coordinates available.")
 
